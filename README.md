@@ -1,3 +1,6 @@
+# NOTICE (UNOFFICIAL BUILD)
+THIS IS A BUILD OF MOONWAKE THAT SUPPORTS DROIDSPACES-OSS 
+
 # MoonWake
 
 Redmi Note 12 pro 5G (ruby) kernel specify for powersave
