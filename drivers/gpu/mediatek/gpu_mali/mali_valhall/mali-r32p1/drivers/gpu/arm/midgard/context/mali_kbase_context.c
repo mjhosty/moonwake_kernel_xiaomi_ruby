@@ -145,37 +145,10 @@ int kbase_context_common_init(struct kbase_context *kctx)
 
 	/* Check if this is a Userspace created context */
 	if (likely(kctx->filp)) {
-		struct pid *pid_struct;
-
-		rcu_read_lock();
-		pid_struct = find_get_pid(kctx->tgid);
-		if (likely(pid_struct)) {
-			struct task_struct *task = pid_task(pid_struct, PIDTYPE_PID);
-
-			if (likely(task)) {
-				/* Take a reference on the task to avoid slow lookup
-				 * later on from the page allocation loop.
-				 */
-				get_task_struct(task);
-				kctx->task = task;
-			} else {
-				dev_err(kctx->kbdev->dev,
-					"Failed to get task pointer for %s/%d",
-					current->comm, current->pid);
-				err = -ESRCH;
-			}
-
-			put_pid(pid_struct);
-		} else {
-			dev_err(kctx->kbdev->dev,
-				"Failed to get pid pointer for %s/%d",
-				current->comm, current->pid);
-			err = -ESRCH;
-		}
-		rcu_read_unlock();
-
-		if (unlikely(err))
-			return err;
+		
+		/* Container fix: tgid is an init-ns number, so use the group leader directly */
+		kctx->task = current->group_leader;
+		get_task_struct(kctx->task);
 
 		/* This merely takes a reference on the mm_struct and not on the
 		 * address space and so won't block the freeing of address space
