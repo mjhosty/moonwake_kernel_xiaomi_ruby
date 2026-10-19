@@ -29,4 +29,10 @@ config SW_SYNC
 	  WARNING: improper use of this can result in deadlocking kernel
 	  drivers from userspace. Intended for test and debug only.
 
+config DMABUF_HEAP_SYSTEM_LITE
+   	tristate "Minimal /dev/dma_heap/system (4.19 backport)"
+   	depends on DMA_SHARED_BUFFER
+   	help
+   	  Creates /dev/dma_heap/system with the DMA_HEAP_IOCTL_ALLOC ioctl.
+
 endmenu
