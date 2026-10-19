@@ -25,6 +25,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/fcntl.h>
+#include <linux/file.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
 #include <linux/kernel.h>
@@ -261,7 +262,8 @@ static const struct dma_buf_ops lite_buf_ops = {
 	.release = lite_release,
 };
 
-static int lite_allocate(unsigned long len, unsigned int fd_flags)
+static struct dma_buf *lite_allocate(unsigned long len,
+				     unsigned int fd_flags)
 {
 	DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
 	struct lite_buffer *buf;
@@ -271,7 +273,7 @@ static int lite_allocate(unsigned long len, unsigned int fd_flags)
 
 	buf = kzalloc(sizeof(*buf), GFP_KERNEL);
 	if (!buf)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	INIT_LIST_HEAD(&buf->attachments);
 	mutex_init(&buf->lock);
@@ -281,7 +283,7 @@ static int lite_allocate(unsigned long len, unsigned int fd_flags)
 				    GFP_KERNEL | __GFP_ZERO);
 	if (!buf->pages) {
 		kfree(buf);
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 	}
 
 	for (i = 0; i < buf->npages; i++) {
@@ -309,22 +311,20 @@ static int lite_allocate(unsigned long len, unsigned int fd_flags)
 		goto err_table;
 	}
 
-	ret = dma_buf_fd(dmabuf, fd_flags);
-	if (ret < 0)
-		dma_buf_put(dmabuf);	/* release() frees the buffer */
-	return ret;
+	return dmabuf;
 
 err_table:
 	sg_free_table(&buf->table);
 err_free:
 	lite_free_buffer(buf);
-	return ret;
+	return ERR_PTR(ret);
 }
 
 static long lite_heap_ioctl(struct file *file, unsigned int cmd,
 			    unsigned long arg)
 {
 	struct lite_heap_alloc_data data;
+	struct dma_buf *dmabuf;
 	unsigned long len;
 	int fd;
 
@@ -345,16 +345,25 @@ static long lite_heap_ioctl(struct file *file, unsigned int cmd,
 
 	len = PAGE_ALIGN(data.len);
 
-	fd = lite_allocate(len, data.fd_flags);
+	/* Reserve the fd first, install it only once everything succeeded. */
+	fd = get_unused_fd_flags(data.fd_flags & O_CLOEXEC);
 	if (fd < 0)
 		return fd;
 
+	dmabuf = lite_allocate(len, data.fd_flags);
+	if (IS_ERR(dmabuf)) {
+		put_unused_fd(fd);
+		return PTR_ERR(dmabuf);
+	}
+
 	data.fd = fd;
 	if (copy_to_user((void __user *)arg, &data, sizeof(data))) {
-		/* Cannot hand the fd back; drop it. */
-		ksys_close(fd);
+		dma_buf_put(dmabuf);	/* release() frees the buffer */
+		put_unused_fd(fd);
 		return -EFAULT;
 	}
+
+	fd_install(fd, dmabuf->file);
 	return 0;
 }
 
