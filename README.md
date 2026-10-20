@@ -1,5 +1,7 @@
 # NOTICE (UNOFFICIAL BUILD)
 THIS IS A BUILD OF MOONWAKE THAT SUPPORTS DROIDSPACES-OSS 
+This is underdevelopment proceed in your own discretion
+
 
 # MoonWake
 
