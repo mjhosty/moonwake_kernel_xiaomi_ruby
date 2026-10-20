@@ -16,7 +16,7 @@
  *     map (kmap) and mmap.
  *   - export info uses struct dma_buf_export_info (DEFINE_DMA_BUF_EXPORT_INFO).
  *
- * UNTESTED. Load it manually first; do not autoload at boot until proven.
+ *
  */
 
 #include <linux/cdev.h>
